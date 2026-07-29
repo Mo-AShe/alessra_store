@@ -1,3 +1,7 @@
+const API = "https://alessra-store.vercel.app";
+
+const apiFetch = (url: string, options?: RequestInit) =>
+  fetch(`${API}${url}`, options);
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   Product,
@@ -107,10 +111,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const loadDataFromBackend = async () => {
     try {
       // 1. Trigger Seed if needed
-      await fetch('/api/seed', { method: 'POST' }).catch(() => {});
+      await apiFetch('/api/seed', { method: 'POST' }).catch(() => {});
 
       // 2. Fetch Products
-      const prodRes = await fetch('/api/products');
+      const prodRes = await apiFetch('/api/products');
       if (prodRes.ok) {
         const prodData = await prodRes.json();
         if (Array.isArray(prodData)) {
@@ -119,7 +123,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       // 3. Fetch Customers
-      const custRes = await fetch('/api/customers');
+      const custRes = await apiFetch('/api/customers');
       if (custRes.ok) {
         const custData = await custRes.json();
         if (Array.isArray(custData)) {
@@ -128,7 +132,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       // 4. Fetch Transactions
-      const txRes = await fetch('/api/transactions');
+      const txRes = await apiFetch('/api/transactions');
       if (txRes.ok) {
         const txData = await txRes.json();
         if (Array.isArray(txData)) {
@@ -137,7 +141,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       // 5. Fetch Settings
-      const setRes = await fetch('/api/settings');
+      const setRes = await apiFetch('/api/settings');
       if (setRes.ok) {
         const setLocalData = await setRes.json();
         if (setLocalData && setLocalData.shop) {
@@ -146,7 +150,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       // 6. Fetch Users
-      const userRes = await fetch('/api/users');
+      const userRes = await apiFetch('/api/users');
       if (userRes.ok) {
         const userData = await userRes.json();
         if (Array.isArray(userData) && userData.length > 0) {
@@ -165,7 +169,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Login handler with database API integration
   const login = async (email: string, pass: string): Promise<boolean> => {
     try {
-      const res = await fetch('/api/login', {
+      const res = await apiFetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password: pass })
@@ -215,7 +219,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Product Actions
   const addProduct = async (p: Omit<Product, 'id'>) => {
     try {
-      const res = await fetch('/api/products', {
+      const res = await apiFetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(p)
@@ -237,7 +241,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const updateProduct = async (updated: Product) => {
     try {
-      const res = await fetch(`/api/products/${updated.id}`, {
+      const res = await apiFetch(`/api/products/${updated.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)
@@ -257,7 +261,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteProduct = async (id: number) => {
     const target = products.find((p) => p.id === id);
     try {
-      await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/products/${id}`, { method: 'DELETE' });
     } catch (e) {}
     setProducts((prev) => prev.filter((p) => p.id !== id));
     showToast(`🗑️ تم حذف المنتج "${target?.name || ''}"`, 'info');
@@ -266,7 +270,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Customer Actions
   const addCustomer = async (c: Omit<Customer, 'id'>) => {
     try {
-      const res = await fetch('/api/customers', {
+      const res = await apiFetch('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(c)
@@ -287,7 +291,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const updateCustomer = async (updated: Customer) => {
     try {
-      const res = await fetch(`/api/customers/${updated.id}`, {
+      const res = await apiFetch(`/api/customers/${updated.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)
@@ -307,7 +311,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteCustomer = async (id: number) => {
     const target = customers.find((c) => c.id === id);
     try {
-      await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/customers/${id}`, { method: 'DELETE' });
     } catch (e) {}
     setCustomers((prev) => prev.filter((c) => c.id !== id));
     showToast(`🗑️ تم حذف العميل "${target?.name || ''}"`, 'info');
@@ -321,7 +325,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     // Call FastAPI Checkout async
-    fetch('/api/checkout', {
+    apiFetch('/api/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cart, discount, selectedCustomerId })
@@ -402,7 +406,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return false;
     }
 
-    fetch('/api/users', {
+    apiFetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(u)
@@ -428,7 +432,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return false;
     }
 
-    fetch(`/api/users/${u.id}`, {
+    apiFetch(`/api/users/${u.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(u)
@@ -443,7 +447,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const target = users.find((u) => u.id === id);
     const nextStatus = target?.status === 'active' ? 'inactive' : 'active';
 
-    fetch(`/api/users/${id}/status`, {
+    apiFetch(`/api/users/${id}/status`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: nextStatus })
@@ -463,7 +467,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Settings
   const updateSettings = async (newSettings: ShopSettings) => {
     try {
-      await fetch('/api/settings', {
+      await apiFetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings)
@@ -484,7 +488,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateUserProfile = (name: string, phone: string) => {
     if (!currentUserSession) return;
 
-    fetch(`/api/users/${currentUserSession.user.id}/profile`, {
+    apiFetch(`/api/users/${currentUserSession.user.id}/profile`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, phone })
@@ -506,7 +510,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return false;
     }
 
-    fetch(`/api/users/${currentUserSession.user.id}/password`, {
+    apiFetch(`/api/users/${currentUserSession.user.id}/password`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ newPassword: newPass })
