@@ -1,7 +1,3 @@
-const API = "https://alessra-store.vercel.app";
-
-const apiFetch = (url: string, options?: RequestInit) =>
-  fetch(`${API}${url}`, options);
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   Product,
