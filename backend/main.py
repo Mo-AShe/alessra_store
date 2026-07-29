@@ -24,14 +24,19 @@ app = FastAPI(
     description="FastAPI Backend powered by Supabase PostgreSQL for Al-Esraa Plumbing Store",
     version="1.0.0"
 )
+
 @app.get("/")
 def root():
     return {"message": "FastAPI is working!"}
 
-# Enable CORS
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://elassra.vercel.app",
+        "http://localhost:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
