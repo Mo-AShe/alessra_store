@@ -1,7 +1,4 @@
-const API = "https://alessra-store.vercel.app";
-
-const apiFetch = (url: string, options?: RequestInit) =>
-  fetch(`${API}${url}`, options);
+// src/context/StoreContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   Product,
@@ -22,44 +19,96 @@ import {
   initialSettings
 } from '../data/initialData';
 
+// API Configuration - Update this to your actual backend URL
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://alessra-store.vercel.app' 
+  : 'http://localhost:8000';
+
+const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const defaultOptions: RequestInit = {
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    ...options,
+  };
+
+  try {
+    const response = await fetch(url, defaultOptions);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    }
+    return response;
+  } catch (error) {
+    console.error('API request failed:', error);
+    throw error;
+  }
+};
+
 interface StoreContextType {
+  // Session & Navigation
   currentUserSession: UserSession | null;
   currentPage: ViewPage;
   setCurrentPage: (page: ViewPage) => void;
+  
+  // Data
   products: Product[];
   customers: Customer[];
   transactions: Transaction[];
   users: User[];
   settings: ShopSettings;
   toasts: ToastMessage[];
+  
+  // Toast functions
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   removeToast: (id: string) => void;
+  
+  // Authentication
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  
   // Product actions
-  addProduct: (product: Omit<Product, 'id'>) => void;
-  updateProduct: (product: Product) => void;
-  deleteProduct: (id: number) => void;
+  addProduct: (product: Omit<Product, 'id'>) => Promise<void>;
+  updateProduct: (product: Product) => Promise<void>;
+  deleteProduct: (id: number) => Promise<void>;
+  
   // Customer actions
-  addCustomer: (customer: Omit<Customer, 'id'>) => void;
-  updateCustomer: (customer: Customer) => void;
-  deleteCustomer: (id: number) => void;
+  addCustomer: (customer: Omit<Customer, 'id'>) => Promise<void>;
+  updateCustomer: (customer: Customer) => Promise<void>;
+  deleteCustomer: (id: number) => Promise<void>;
+  
   // POS Checkout
   processCheckout: (cart: CartItem[], discount: number, selectedCustomerId?: number) => { success: boolean; invoiceNo: string };
+  
   // User actions
   addUser: (user: Omit<User, 'id'>) => boolean;
   updateUser: (user: User) => boolean;
   toggleUserStatus: (id: number) => void;
+  
   // Settings actions
-  updateSettings: (newSettings: ShopSettings) => void;
+  updateSettings: (newSettings: ShopSettings) => Promise<void>;
   resetSettingsToDefault: () => void;
+  
   // Profile
   updateUserProfile: (name: string, phone: string) => void;
   changeUserPassword: (currentPass: string, newPass: string) => boolean;
-  // Data Refresh
+  
+  // Data operations
   refreshStoreData: () => void;
-  // Import/Export
   importStoreData: (data: any) => boolean;
+  exportStoreData: () => any;
+  
+  // Reports
+  getSalesReport: (startDate?: string, endDate?: string) => {
+    totalSales: number;
+    averageOrder: number;
+    totalOrders: number;
+    transactions: Transaction[];
+  };
+  getTopProducts: (limit?: number) => Array<{ name: string; total: number; qty: number }>;
+  getCustomerReport: () => Array<Customer & { orderCount: number; averageOrder: number }>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -84,7 +133,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // 1. Session State
+  // Session State
   const [currentUserSession, setCurrentUserSession] = useState<UserSession | null>(() => {
     const saved = localStorage.getItem('userSession');
     if (saved) {
@@ -159,6 +208,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (err) {
       console.warn('Backend sync warning, using local state:', err);
+      // If backend fails, use initial data
+      setProducts(initialProducts);
+      setCustomers(initialCustomers);
+      setTransactions(initialTransactions);
+      setSettings(initialSettings);
+      setUsers(initialUsers);
     }
   };
 
@@ -183,7 +238,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           };
           setCurrentUserSession(session);
           localStorage.setItem('userSession', JSON.stringify(session));
-          showToast(`مرحباً بك ${data.user.name}! تم تسجيل الدخول بنجاح من قاعدة البيانات`, 'success');
+          showToast(`مرحباً بك ${data.user.name}! تم تسجيل الدخول بنجاح`, 'success');
           setCurrentPage('dashboard');
           return true;
         }
@@ -192,9 +247,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.warn('Backend login warning, checking local user state:', err);
     }
 
-    // Local fallback
+    // Local fallback (for development)
     const found = users.find(
-      (u) => u.email === email && (u.password === pass || pass === 'admin123' || pass === 'emp123' || pass === 'inv123')
+      (u) => u.email === email && 
+      (u.password === pass || pass === 'admin123' || pass === 'emp123' || pass === 'inv123')
     );
     if (found && found.status !== 'inactive') {
       const session: UserSession = {
@@ -207,6 +263,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setCurrentPage('dashboard');
       return true;
     }
+    
+    showToast('❌ البريد الإلكتروني أو كلمة المرور غير صحيحة', 'error');
     return false;
   };
 
@@ -227,7 +285,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (res.ok) {
         const created = await res.json();
         setProducts((prev) => [created, ...prev]);
-        showToast(`✅ تم إضافة المنتج "${created.name}" في قاعدة البيانات بنجاح`, 'success');
+        showToast(`✅ تم إضافة المنتج "${created.name}" بنجاح`, 'success');
         return;
       }
     } catch (e) {}
@@ -236,7 +294,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newId = products.length > 0 ? Math.max(...products.map((item) => item.id)) + 1 : 1;
     const newProduct: Product = { ...p, id: newId };
     setProducts((prev) => [newProduct, ...prev]);
-    showToast(`✅ تم إضافة المنتج "${newProduct.name}" بنجاح`, 'success');
+    showToast(`✅ تم إضافة المنتج "${newProduct.name}" بنجاح (محلياً)`, 'success');
   };
 
   const updateProduct = async (updated: Product) => {
@@ -255,7 +313,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {}
 
     setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    showToast(`✅ تم تحديث بيانات المنتج "${updated.name}"`, 'success');
+    showToast(`✅ تم تحديث بيانات المنتج "${updated.name}" (محلياً)`, 'success');
   };
 
   const deleteProduct = async (id: number) => {
@@ -286,7 +344,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newId = customers.length > 0 ? Math.max(...customers.map((item) => item.id)) + 1 : 1;
     const newCust: Customer = { ...c, id: newId };
     setCustomers((prev) => [newCust, ...prev]);
-    showToast(`👤 تم إضافة العميل "${newCust.name}" بنجاح`, 'success');
+    showToast(`👤 تم إضافة العميل "${newCust.name}" بنجاح (محلياً)`, 'success');
   };
 
   const updateCustomer = async (updated: Customer) => {
@@ -305,7 +363,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {}
 
     setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-    showToast(`✅ تم تحديث بيانات العميل "${updated.name}"`, 'success');
+    showToast(`✅ تم تحديث بيانات العميل "${updated.name}" (محلياً)`, 'success');
   };
 
   const deleteCustomer = async (id: number) => {
@@ -472,10 +530,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings)
       });
-    } catch (e) {}
-
-    setSettings(newSettings);
-    showToast('✅ تم حفظ الإعدادات بنجاح!', 'success');
+      setSettings(newSettings);
+      showToast('✅ تم حفظ الإعدادات بنجاح!', 'success');
+    } catch (e) {
+      setSettings(newSettings);
+      showToast('✅ تم حفظ الإعدادات محلياً!', 'success');
+    }
   };
 
   const resetSettingsToDefault = () => {
@@ -494,18 +554,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       body: JSON.stringify({ name, phone })
     }).catch(() => {});
 
-    const updatedUser = { ...currentUserSession.user, name };
+    const updatedUser = { ...currentUserSession.user, name, phone };
     const updatedSession = { ...currentUserSession, user: updatedUser };
     setCurrentUserSession(updatedSession);
     localStorage.setItem('userSession', JSON.stringify(updatedSession));
-    localStorage.setItem('userPhone', phone);
     setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
     showToast('✅ تم حفظ بيانات الملف الشخصي بنجاح!', 'success');
   };
 
   const changeUserPassword = (currentPass: string, newPass: string): boolean => {
     if (!currentUserSession) return false;
-    if (currentPass !== 'admin123' && currentPass !== 'emp123' && currentPass !== currentUserSession.user.password) {
+    if (currentPass !== currentUserSession.user.password) {
       showToast('❌ كلمة المرور الحالية غير صحيحة', 'error');
       return false;
     }
@@ -532,6 +591,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
+  const exportStoreData = () => {
+    return {
+      products,
+      customers,
+      transactions,
+      settings,
+      users,
+      exportDate: new Date().toISOString()
+    };
+  };
+
   const importStoreData = (data: any): boolean => {
     try {
       if (data.products) setProducts(data.products);
@@ -545,6 +615,68 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       showToast('⚠️ خطأ في تنسيق ملف البيانات', 'error');
       return false;
     }
+  };
+
+  // Report Functions
+  const getSalesReport = (startDate?: string, endDate?: string) => {
+    let filtered = [...transactions];
+    
+    if (startDate) {
+      filtered = filtered.filter(t => t.date >= startDate);
+    }
+    if (endDate) {
+      filtered = filtered.filter(t => t.date <= endDate);
+    }
+
+    const totalSales = filtered.reduce((sum, t) => sum + t.amount, 0);
+    const averageOrder = filtered.length > 0 ? totalSales / filtered.length : 0;
+    const totalOrders = filtered.length;
+
+    return {
+      totalSales,
+      averageOrder,
+      totalOrders,
+      transactions: filtered
+    };
+  };
+
+  const getTopProducts = (limit: number = 5) => {
+    const productSales = new Map<number, { name: string; total: number; qty: number }>();
+    
+    transactions.forEach(t => {
+      const product = products.find(p => t.productName.includes(p.name));
+      if (product) {
+        const existing = productSales.get(product.id);
+        if (existing) {
+          existing.total += t.amount;
+          existing.qty += 1;
+        } else {
+          productSales.set(product.id, {
+            name: product.name,
+            total: t.amount,
+            qty: 1
+          });
+        }
+      }
+    });
+
+    return Array.from(productSales.values())
+      .sort((a, b) => b.total - a.total)
+      .slice(0, limit);
+  };
+
+  const getCustomerReport = () => {
+    return customers.map(c => {
+      const customerTransactions = transactions.filter(t => t.customerName === c.name);
+      const orderCount = customerTransactions.length;
+      const averageOrder = orderCount > 0 ? c.totalPurchases / orderCount : 0;
+      
+      return {
+        ...c,
+        orderCount,
+        averageOrder
+      };
+    });
   };
 
   return (
@@ -578,7 +710,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateUserProfile,
         changeUserPassword,
         refreshStoreData,
-        importStoreData
+        importStoreData,
+        exportStoreData,
+        getSalesReport,
+        getTopProducts,
+        getCustomerReport
       }}
     >
       {children}
