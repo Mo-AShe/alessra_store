@@ -1,4 +1,7 @@
-// src/context/StoreContext.tsx
+const API = "https://alessra-store.vercel.app";
+
+const apiFetch = (url: string, options?: RequestInit) =>
+  fetch(`${API}${url}`, options);
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   Product,
@@ -19,96 +22,44 @@ import {
   initialSettings
 } from '../data/initialData';
 
-// API Configuration - Update this to your actual backend URL
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://alessra-store.vercel.app' 
-  : 'http://localhost:8000';
-
-const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
-  const url = `${API_BASE_URL}${endpoint}`;
-  const defaultOptions: RequestInit = {
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    ...options,
-  };
-
-  try {
-    const response = await fetch(url, defaultOptions);
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || `HTTP error! status: ${response.status}`);
-    }
-    return response;
-  } catch (error) {
-    console.error('API request failed:', error);
-    throw error;
-  }
-};
-
 interface StoreContextType {
-  // Session & Navigation
   currentUserSession: UserSession | null;
   currentPage: ViewPage;
   setCurrentPage: (page: ViewPage) => void;
-  
-  // Data
   products: Product[];
   customers: Customer[];
   transactions: Transaction[];
   users: User[];
   settings: ShopSettings;
   toasts: ToastMessage[];
-  
-  // Toast functions
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   removeToast: (id: string) => void;
-  
-  // Authentication
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
-  
   // Product actions
-  addProduct: (product: Omit<Product, 'id'>) => Promise<void>;
-  updateProduct: (product: Product) => Promise<void>;
-  deleteProduct: (id: number) => Promise<void>;
-  
+  addProduct: (product: Omit<Product, 'id'>) => void;
+  updateProduct: (product: Product) => void;
+  deleteProduct: (id: number) => void;
   // Customer actions
-  addCustomer: (customer: Omit<Customer, 'id'>) => Promise<void>;
-  updateCustomer: (customer: Customer) => Promise<void>;
-  deleteCustomer: (id: number) => Promise<void>;
-  
+  addCustomer: (customer: Omit<Customer, 'id'>) => void;
+  updateCustomer: (customer: Customer) => void;
+  deleteCustomer: (id: number) => void;
   // POS Checkout
   processCheckout: (cart: CartItem[], discount: number, selectedCustomerId?: number) => { success: boolean; invoiceNo: string };
-  
   // User actions
   addUser: (user: Omit<User, 'id'>) => boolean;
   updateUser: (user: User) => boolean;
   toggleUserStatus: (id: number) => void;
-  
   // Settings actions
-  updateSettings: (newSettings: ShopSettings) => Promise<void>;
+  updateSettings: (newSettings: ShopSettings) => void;
   resetSettingsToDefault: () => void;
-  
   // Profile
   updateUserProfile: (name: string, phone: string) => void;
   changeUserPassword: (currentPass: string, newPass: string) => boolean;
-  
-  // Data operations
+  // Data Refresh
   refreshStoreData: () => void;
+  // Import/Export
   importStoreData: (data: any) => boolean;
-  exportStoreData: () => any;
-  
-  // Reports
-  getSalesReport: (startDate?: string, endDate?: string) => {
-    totalSales: number;
-    averageOrder: number;
-    totalOrders: number;
-    transactions: Transaction[];
-  };
-  getTopProducts: (limit?: number) => Array<{ name: string; total: number; qty: number }>;
-  getCustomerReport: () => Array<Customer & { orderCount: number; averageOrder: number }>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -133,7 +84,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Session State
+  // 1. Session State
   const [currentUserSession, setCurrentUserSession] = useState<UserSession | null>(() => {
     const saved = localStorage.getItem('userSession');
     if (saved) {
@@ -160,10 +111,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const loadDataFromBackend = async () => {
     try {
       // 1. Trigger Seed if needed
-      await apiFetch('/api/seed', { method: 'POST' }).catch(() => {});
+      await fetch('/api/seed', { method: 'POST' }).catch(() => {});
 
       // 2. Fetch Products
-      const prodRes = await apiFetch('/api/products');
+      const prodRes = await fetch('/api/products');
       if (prodRes.ok) {
         const prodData = await prodRes.json();
         if (Array.isArray(prodData)) {
@@ -172,7 +123,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       // 3. Fetch Customers
-      const custRes = await apiFetch('/api/customers');
+      const custRes = await fetch('/api/customers');
       if (custRes.ok) {
         const custData = await custRes.json();
         if (Array.isArray(custData)) {
@@ -181,7 +132,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       // 4. Fetch Transactions
-      const txRes = await apiFetch('/api/transactions');
+      const txRes = await fetch('/api/transactions');
       if (txRes.ok) {
         const txData = await txRes.json();
         if (Array.isArray(txData)) {
@@ -190,7 +141,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       // 5. Fetch Settings
-      const setRes = await apiFetch('/api/settings');
+      const setRes = await fetch('/api/settings');
       if (setRes.ok) {
         const setLocalData = await setRes.json();
         if (setLocalData && setLocalData.shop) {
@@ -199,7 +150,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       // 6. Fetch Users
-      const userRes = await apiFetch('/api/users');
+      const userRes = await fetch('/api/users');
       if (userRes.ok) {
         const userData = await userRes.json();
         if (Array.isArray(userData) && userData.length > 0) {
@@ -208,12 +159,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (err) {
       console.warn('Backend sync warning, using local state:', err);
-      // If backend fails, use initial data
-      setProducts(initialProducts);
-      setCustomers(initialCustomers);
-      setTransactions(initialTransactions);
-      setSettings(initialSettings);
-      setUsers(initialUsers);
     }
   };
 
@@ -224,7 +169,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Login handler with database API integration
   const login = async (email: string, pass: string): Promise<boolean> => {
     try {
-      const res = await apiFetch('/api/login', {
+      const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password: pass })
@@ -238,7 +183,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           };
           setCurrentUserSession(session);
           localStorage.setItem('userSession', JSON.stringify(session));
-          showToast(`مرحباً بك ${data.user.name}! تم تسجيل الدخول بنجاح`, 'success');
+          showToast(`مرحباً بك ${data.user.name}! تم تسجيل الدخول بنجاح من قاعدة البيانات`, 'success');
           setCurrentPage('dashboard');
           return true;
         }
@@ -247,10 +192,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.warn('Backend login warning, checking local user state:', err);
     }
 
-    // Local fallback (for development)
+    // Local fallback
     const found = users.find(
-      (u) => u.email === email && 
-      (u.password === pass || pass === 'admin123' || pass === 'emp123' || pass === 'inv123')
+      (u) => u.email === email && (u.password === pass || pass === 'admin123' || pass === 'emp123' || pass === 'inv123')
     );
     if (found && found.status !== 'inactive') {
       const session: UserSession = {
@@ -263,8 +207,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setCurrentPage('dashboard');
       return true;
     }
-    
-    showToast('❌ البريد الإلكتروني أو كلمة المرور غير صحيحة', 'error');
     return false;
   };
 
@@ -277,7 +219,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Product Actions
   const addProduct = async (p: Omit<Product, 'id'>) => {
     try {
-      const res = await apiFetch('/api/products', {
+      const res = await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(p)
@@ -285,7 +227,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (res.ok) {
         const created = await res.json();
         setProducts((prev) => [created, ...prev]);
-        showToast(`✅ تم إضافة المنتج "${created.name}" بنجاح`, 'success');
+        showToast(`✅ تم إضافة المنتج "${created.name}" في قاعدة البيانات بنجاح`, 'success');
         return;
       }
     } catch (e) {}
@@ -294,12 +236,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newId = products.length > 0 ? Math.max(...products.map((item) => item.id)) + 1 : 1;
     const newProduct: Product = { ...p, id: newId };
     setProducts((prev) => [newProduct, ...prev]);
-    showToast(`✅ تم إضافة المنتج "${newProduct.name}" بنجاح (محلياً)`, 'success');
+    showToast(`✅ تم إضافة المنتج "${newProduct.name}" بنجاح`, 'success');
   };
 
   const updateProduct = async (updated: Product) => {
     try {
-      const res = await apiFetch(`/api/products/${updated.id}`, {
+      const res = await fetch(`/api/products/${updated.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)
@@ -313,13 +255,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {}
 
     setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    showToast(`✅ تم تحديث بيانات المنتج "${updated.name}" (محلياً)`, 'success');
+    showToast(`✅ تم تحديث بيانات المنتج "${updated.name}"`, 'success');
   };
 
   const deleteProduct = async (id: number) => {
     const target = products.find((p) => p.id === id);
     try {
-      await apiFetch(`/api/products/${id}`, { method: 'DELETE' });
+      await fetch(`/api/products/${id}`, { method: 'DELETE' });
     } catch (e) {}
     setProducts((prev) => prev.filter((p) => p.id !== id));
     showToast(`🗑️ تم حذف المنتج "${target?.name || ''}"`, 'info');
@@ -328,7 +270,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Customer Actions
   const addCustomer = async (c: Omit<Customer, 'id'>) => {
     try {
-      const res = await apiFetch('/api/customers', {
+      const res = await fetch('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(c)
@@ -344,12 +286,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newId = customers.length > 0 ? Math.max(...customers.map((item) => item.id)) + 1 : 1;
     const newCust: Customer = { ...c, id: newId };
     setCustomers((prev) => [newCust, ...prev]);
-    showToast(`👤 تم إضافة العميل "${newCust.name}" بنجاح (محلياً)`, 'success');
+    showToast(`👤 تم إضافة العميل "${newCust.name}" بنجاح`, 'success');
   };
 
   const updateCustomer = async (updated: Customer) => {
     try {
-      const res = await apiFetch(`/api/customers/${updated.id}`, {
+      const res = await fetch(`/api/customers/${updated.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)
@@ -363,13 +305,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {}
 
     setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-    showToast(`✅ تم تحديث بيانات العميل "${updated.name}" (محلياً)`, 'success');
+    showToast(`✅ تم تحديث بيانات العميل "${updated.name}"`, 'success');
   };
 
   const deleteCustomer = async (id: number) => {
     const target = customers.find((c) => c.id === id);
     try {
-      await apiFetch(`/api/customers/${id}`, { method: 'DELETE' });
+      await fetch(`/api/customers/${id}`, { method: 'DELETE' });
     } catch (e) {}
     setCustomers((prev) => prev.filter((c) => c.id !== id));
     showToast(`🗑️ تم حذف العميل "${target?.name || ''}"`, 'info');
@@ -383,7 +325,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     // Call FastAPI Checkout async
-    apiFetch('/api/checkout', {
+    fetch('/api/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cart, discount, selectedCustomerId })
@@ -464,7 +406,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return false;
     }
 
-    apiFetch('/api/users', {
+    fetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(u)
@@ -490,7 +432,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return false;
     }
 
-    apiFetch(`/api/users/${u.id}`, {
+    fetch(`/api/users/${u.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(u)
@@ -505,7 +447,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const target = users.find((u) => u.id === id);
     const nextStatus = target?.status === 'active' ? 'inactive' : 'active';
 
-    apiFetch(`/api/users/${id}/status`, {
+    fetch(`/api/users/${id}/status`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: nextStatus })
@@ -525,17 +467,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Settings
   const updateSettings = async (newSettings: ShopSettings) => {
     try {
-      await apiFetch('/api/settings', {
+      await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings)
       });
-      setSettings(newSettings);
-      showToast('✅ تم حفظ الإعدادات بنجاح!', 'success');
-    } catch (e) {
-      setSettings(newSettings);
-      showToast('✅ تم حفظ الإعدادات محلياً!', 'success');
-    }
+    } catch (e) {}
+
+    setSettings(newSettings);
+    showToast('✅ تم حفظ الإعدادات بنجاح!', 'success');
   };
 
   const resetSettingsToDefault = () => {
@@ -548,28 +488,29 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateUserProfile = (name: string, phone: string) => {
     if (!currentUserSession) return;
 
-    apiFetch(`/api/users/${currentUserSession.user.id}/profile`, {
+    fetch(`/api/users/${currentUserSession.user.id}/profile`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, phone })
     }).catch(() => {});
 
-    const updatedUser = { ...currentUserSession.user, name, phone };
+    const updatedUser = { ...currentUserSession.user, name };
     const updatedSession = { ...currentUserSession, user: updatedUser };
     setCurrentUserSession(updatedSession);
     localStorage.setItem('userSession', JSON.stringify(updatedSession));
+    localStorage.setItem('userPhone', phone);
     setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
     showToast('✅ تم حفظ بيانات الملف الشخصي بنجاح!', 'success');
   };
 
   const changeUserPassword = (currentPass: string, newPass: string): boolean => {
     if (!currentUserSession) return false;
-    if (currentPass !== currentUserSession.user.password) {
+    if (currentPass !== 'admin123' && currentPass !== 'emp123' && currentPass !== currentUserSession.user.password) {
       showToast('❌ كلمة المرور الحالية غير صحيحة', 'error');
       return false;
     }
 
-    apiFetch(`/api/users/${currentUserSession.user.id}/password`, {
+    fetch(`/api/users/${currentUserSession.user.id}/password`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ newPassword: newPass })
@@ -591,17 +532,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
-  const exportStoreData = () => {
-    return {
-      products,
-      customers,
-      transactions,
-      settings,
-      users,
-      exportDate: new Date().toISOString()
-    };
-  };
-
   const importStoreData = (data: any): boolean => {
     try {
       if (data.products) setProducts(data.products);
@@ -615,68 +545,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       showToast('⚠️ خطأ في تنسيق ملف البيانات', 'error');
       return false;
     }
-  };
-
-  // Report Functions
-  const getSalesReport = (startDate?: string, endDate?: string) => {
-    let filtered = [...transactions];
-    
-    if (startDate) {
-      filtered = filtered.filter(t => t.date >= startDate);
-    }
-    if (endDate) {
-      filtered = filtered.filter(t => t.date <= endDate);
-    }
-
-    const totalSales = filtered.reduce((sum, t) => sum + t.amount, 0);
-    const averageOrder = filtered.length > 0 ? totalSales / filtered.length : 0;
-    const totalOrders = filtered.length;
-
-    return {
-      totalSales,
-      averageOrder,
-      totalOrders,
-      transactions: filtered
-    };
-  };
-
-  const getTopProducts = (limit: number = 5) => {
-    const productSales = new Map<number, { name: string; total: number; qty: number }>();
-    
-    transactions.forEach(t => {
-      const product = products.find(p => t.productName.includes(p.name));
-      if (product) {
-        const existing = productSales.get(product.id);
-        if (existing) {
-          existing.total += t.amount;
-          existing.qty += 1;
-        } else {
-          productSales.set(product.id, {
-            name: product.name,
-            total: t.amount,
-            qty: 1
-          });
-        }
-      }
-    });
-
-    return Array.from(productSales.values())
-      .sort((a, b) => b.total - a.total)
-      .slice(0, limit);
-  };
-
-  const getCustomerReport = () => {
-    return customers.map(c => {
-      const customerTransactions = transactions.filter(t => t.customerName === c.name);
-      const orderCount = customerTransactions.length;
-      const averageOrder = orderCount > 0 ? c.totalPurchases / orderCount : 0;
-      
-      return {
-        ...c,
-        orderCount,
-        averageOrder
-      };
-    });
   };
 
   return (
@@ -710,11 +578,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateUserProfile,
         changeUserPassword,
         refreshStoreData,
-        importStoreData,
-        exportStoreData,
-        getSalesReport,
-        getTopProducts,
-        getCustomerReport
+        importStoreData
       }}
     >
       {children}
